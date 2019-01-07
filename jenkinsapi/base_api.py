@@ -41,11 +41,11 @@ class jenkinsapi:
 
         # We need to deal with json vs. data when uploading files
         if files:
+            data = None
+            json = post_data
+        else:
             data = post_data
             json = None
-        else:
-            json = post_data
-            data = None
 
         result = self._session.request(verb, url, json=json, data=data, params=params,
                                        files=files, headers=self.DEFAULT_HEADERS)
@@ -188,7 +188,7 @@ class jenkinsapi:
 
     def create_job(self, job_name, config_xml):
         """
-        Create a new Jenkins job
+        创建新的Jenkins job
         :param job_name:
         :param config_xml:
         :return:
@@ -214,5 +214,3 @@ class jenkinsapi:
         for item in self.get_jobs_info()['jobs']:
             jobs_list.append(item['name'])
         return jobs_list
-
-
