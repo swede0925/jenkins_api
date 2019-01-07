@@ -136,18 +136,6 @@ class jenkinsapi:
         resp = self.http_get(JOB_INFO_ENDPOINT)
         return resp.json()
 
-    def get_build_info(self, job_name, build_number, depth=0):
-        """
-        获取job第number次信息
-        :param job_name:
-        :param build_number:
-        :param depth:
-        :return:
-        """
-        JOB_BUILD_INFO_ENDPOINT = 'job/%s/%d/api/json?depth=%s' % (job_name, build_number, depth)
-        resp = self.http_get(JOB_BUILD_INFO_ENDPOINT)
-        return resp.json()
-
     def enable_job(self, job_name):
         """
         Enable Jenkins job.
@@ -196,7 +184,16 @@ class jenkinsapi:
         CREATE_JOB_ENDPOINT = 'createItem'
         self.http_post(CREATE_JOB_ENDPOINT, query_data={'name': job_name}, post_data=config_xml.encode('utf-8'))
 
-    def get_jobs_info(self):
+    def delete_job(self, job_name):
+        """
+        删除job
+        :param job_name:
+        :return:
+        """
+        DELETE_JOB_ENDPOINT = 'job/%s/doDelete' % job_name
+        self.http_post(DELETE_JOB_ENDPOINT)
+
+    def get_info(self):
         """
         获取所有项目信息
         :return:
@@ -205,12 +202,93 @@ class jenkinsapi:
         resp = self.http_get(INFO_ENDPOINT)
         return resp.json()
 
-    def get_jobs_name(self):
+    def get_jobs(self):
         """
-        获取所有项目信息
+        获取所有job信息
         :return:
         """
-        jobs_list = []
-        for item in self.get_jobs_info()['jobs']:
-            jobs_list.append(item['name'])
+        return self.get_info()['jobs']
+
+    def get_jobs_name(self):
+        """
+        获取所有job名字
+        :return:
+        """
+        jobs_list = [item['name'] for item in self.get_jobs()]
         return jobs_list
+
+    def get_views(self):
+        """
+        获取所有Views信息
+        :return:
+        """
+        return self.get_info()['views']
+
+    def get_views_name(self):
+        """
+        获取所有View名字
+        :return:
+        """
+        views_List = [item['name'] for item in self.get_views()]
+        return views_List
+
+    def get_view_jobs(self, view_name):
+        """
+        获取指定View下所有的job
+        :param view_name:
+        :return:
+        """
+        VIEW_JOBS_ENDPOINT = 'view/%s/api/json?tree=jobs[url,color,name]' % view_name
+        resp = self.http_get(VIEW_JOBS_ENDPOINT)
+        return resp.json()['jobs']
+
+    def get_view_config(self, view_name):
+        """
+        获取View配置信息
+        :param view_name:
+        :return:
+        """
+        CONFIG_VIEW_ENDPOINT = 'view/%s/config.xml' % view_name
+        resp = self.http_get(CONFIG_VIEW_ENDPOINT)
+        return resp.content
+
+    def create_view(self, view_name, config_xml):
+        """
+        创建新的View
+        :param view_name:
+        :param config_xml:
+        :return:
+        """
+        CREATE_VIEW_ENDPOINT = 'createView'
+        self.http_post(CREATE_VIEW_ENDPOINT, query_data={'name': view_name}, post_data=config_xml.encode('utf-8'))
+
+    def reconfig_view(self, view_name, config_xml):
+        """
+        重置View配置
+        :param view_name:
+        :param config_xml:
+        :return:
+        """
+        CONFIG_VIEW_ENDPOINT = 'view/%s/config.xml' % view_name
+        self.http_post(CONFIG_VIEW_ENDPOINT, post_data=config_xml.encode('utf-8'))
+
+    def delete_view(self, view_name):
+        """
+        删除View
+        :param view_name:
+        :return:
+        """
+        DELETE_VIEW_ENDPOINT = 'view/%s/doDelete' % view_name
+        self.http_post(DELETE_VIEW_ENDPOINT)
+
+    def get_build_info(self, job_name, build_number, depth=0):
+        """
+        获取job第number次信息
+        :param job_name:
+        :param build_number:
+        :param depth:
+        :return:
+        """
+        BUILD_INFO_ENDPOINT = 'job/%s/%d/api/json?depth=%s' % (job_name, build_number, depth)
+        resp = self.http_get(BUILD_INFO_ENDPOINT)
+        return resp.json()
