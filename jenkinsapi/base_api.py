@@ -413,7 +413,7 @@ class jenkinsapi:
         """
         NODE_LIST_ENDPOINT = 'computer/api/json'
         resp = self.http_get(NODE_LIST_ENDPOINT, query_data={'depth': depth})
-        return [{'name': c["displayName"], 'offline': c["offline"]} for c in resp.json()["computer"]]
+        return resp.json()["computer"]
 
     def get_node_info(self, node_name, depth=0):
         """
@@ -487,7 +487,7 @@ class jenkinsapi:
         :return:
         """
         running_build = []
-        nodes = self.get_nodes()
+        nodes = [{'name': c["displayName"]} for c in self.get_nodes()]
         for node in nodes:
             if node['name'] == 'master':
                 node_name = '(master)'
