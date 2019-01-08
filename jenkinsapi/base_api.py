@@ -2,6 +2,8 @@
 # -*- coding:utf-8 -*-
 
 import requests
+import re
+from six.moves.urllib.parse import urlparse
 from .common import copy_dict, ClientError, AuthError, ValidationError, ServerError
 
 class jenkinsapi:
@@ -313,6 +315,18 @@ class jenkinsapi:
         resp = self.http_get(BUILD_INFO_ENDPOINT, query_data={'depth': depth})
         return resp.json()
 
+    def get_build_branch(self, job_name, build_number):
+        """
+        获取Jenkins job的分支信息
+        :param job_name:
+        :param build_number:
+        :return:
+        """
+        build_info = self.get_build_info(job_name, build_number)
+        _actions = [x for x in build_info['actions'] if x and "lastBuiltRevision" in x]
+        build_branch = _actions[0]["lastBuiltRevision"]["branch"][0]["name"]
+        return build_branch
+
     def build_job(self, job_name, parameters=None):
         """
         触发jenkins job,可以带参数
@@ -390,3 +404,108 @@ class jenkinsapi:
             self.http_post(CANCEL_QUEUE_ENDPOINT, query_data={'id': id})
         except Exception:
             pass
+
+    def get_nodes(self, depth=0):
+        """
+        获取节点nodes信息
+        :param depth:
+        :return:
+        """
+        NODE_LIST_ENDPOINT = 'computer/api/json'
+        resp = self.http_get(NODE_LIST_ENDPOINT, query_data={'depth': depth})
+        return [{'name': c["displayName"], 'offline': c["offline"]} for c in resp.json()["computer"]]
+
+    def get_node_info(self, node_name, depth=0):
+        """
+        获取指定节点的信息
+        :param node_name:
+        :param depth:
+        :return:
+        """
+        NODE_INFO_ENDPOINT = 'computer/%s/api/json' % node_name
+        resp = self.http_get(NODE_INFO_ENDPOINT, query_data={'depth': depth})
+        return resp.json()
+
+    def delete_node(self, node_name):
+        """
+        删除节点
+        :param node_name:
+        :return:
+        """
+        DELETE_NODE_ENDPOINT = 'computer/%s/doDelete' % node_name
+        self.http_post(DELETE_NODE_ENDPOINT)
+
+    def enable_node(self, node_name):
+        """
+        Enable a node
+        :param node_name:
+        :return:
+        """
+        info = self.get_node_info(node_name)
+        if not info['offline']:
+            return
+        msg = ''
+        TOGGLE_OFFLINE_ENDPOINT = 'computer/%s/toggleOffline' % node_name
+        self.http_post(TOGGLE_OFFLINE_ENDPOINT, query_data={'offlineMessage': msg})
+
+    def disable_node(self, node_name, msg=''):
+        """
+        Disable a node
+        :param node_name:
+        :param msg:
+        :return:
+        """
+        info = self.get_node_info(node_name)
+        if info['offline']:
+            return
+        TOGGLE_OFFLINE_ENDPOINT = 'computer/%s/toggleOffline' % node_name
+        self.http_post(TOGGLE_OFFLINE_ENDPOINT, query_data={'offlineMessage': msg})
+
+    def get_node_config(self, node_name):
+        """
+        获取节点配置
+        :param node_name:
+        :return:
+        """
+        CONFIG_NODE_ENDPOINT = 'computer/%s/config.xml' % node_name
+        resp = self.http_get(CONFIG_NODE_ENDPOINT)
+        return resp.content
+
+    def reconfig_node(self, node_name, config_xml):
+        """
+        重置节点配置
+        :param node_name:
+        :param config_xml:
+        :return:
+        """
+        CONFIG_NODE_ENDPOINT = 'computer/%s/config.xml' % node_name
+        self.http_post(CONFIG_NODE_ENDPOINT, post_data=config_xml.encode('utf-8'))
+
+    def get_running_builds(self):
+        """
+        获取正在运行的job
+        :return:
+        """
+        running_build = []
+        nodes = self.get_nodes()
+        for node in nodes:
+            if node['name'] == 'master':
+                node_name = '(master)'
+            else:
+                node_name = node['name']
+
+            info = self.get_node_info(node_name, depth=2)
+            for executor in info['executors']:
+                executable = executor['currentExecutable']
+                if executable and 'PlaceholderTask' not in executable.get('_class', ''):
+                    executor_number = executor['number']
+                    build_number = executable['number']
+                    url = executable['url']
+                    m = re.search(r'/job/([^/]+)/.*', urlparse(url).path)
+                    job_name = m.group(1)
+                    running_build.append({'name': job_name,
+                                   'number': build_number,
+                                   'url': url,
+                                   'node': node_name,
+                                   'executor': executor_number})
+        return running_build
